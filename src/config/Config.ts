@@ -14,7 +14,9 @@ export const paths = {
 export const urls = {
     TWITTER_REQUEST_TOKEN: twitter_base_url + "/oauth/request_token",
     TWITTER_ACCESS_TOKEN: twitter_base_url + "/oauth/access_token",
-    TWITTER_UPDATE_STATUS: twitter_base_url + "/1.1/statuses/update.json"
+    TWITTER_UPDATE_STATUS: twitter_base_url + "/1.1/statuses/update.json",
+    TWITTER_STREAM: twitter_base_url + "/2/tweets/search/stream?tweet.fields=context_annotations&expansions=author_id",
+    TWITTER_RULES: twitter_base_url + "/2/tweets/search/stream/rules"
 }
 
 export const vars = {

@@ -3,10 +3,13 @@ import { vars, urls } from "../config/Config";
 import { OAuth } from "../utils/Oauth";
 import axios, { AxiosError } from "axios";
 import express from "express";
+import socket, { Socket } from "socket.io";
+import request from "request"
 
 const callbackUrl = "http://127.0.0.1:8080/twitter/callback";
+let timeout = 0;
 
-export const login = async () => {
+export const login = async (req: express.Request, res: express.Response) => {
     let oauth = new OAuth(urls.TWITTER_REQUEST_TOKEN, vars.twitterAccessToken, vars.twitterAccessTokenSecret, vars.twitterKey, vars.twitterSecret, callbackUrl);
     console.log(oauth.getAuthHeader())
     axios.post(urls.TWITTER_REQUEST_TOKEN, {}, {
@@ -46,20 +49,50 @@ export const getAccessToken = async (req: express.Request, res: express.Response
         })
 }
 
-export const getFeed = async (req: express.Request, res: express.Response) => {
-    var oauth_token = req.body.oauth_token;
-    var oauth_token_secret = req.body.oauth_token_secret;
-    const twitClient = new twit({
-        consumer_key: vars.twitterKey,
-        consumer_secret: vars.twitterSecret,
-        access_token: oauth_token,
-        access_token_secret: oauth_token_secret
-    })
-    twitClient.get("", (err, result, response) => {
+export const getFeed = async (socket: Socket) => {
+    var stream;
+    const config = {
+        url: urls.TWITTER_STREAM,
+        auth: {
+            bearer: vars.twitterBearerToken
+        },
+        timeout: 31000
+    };
+    try{
+        const stream = request.get(config);
 
-    })
-    res.end();
+        stream.on("data", (data) => {
+            try {
+              const json = JSON.parse(data.toString());
+              if (json.connection_issue) {
+                socket.emit("error", json);
+                reconnect(stream, socket);
+              } else {
+                if (json.data) {
+                  socket.emit("tweet", json);
+                } else {
+                  socket.emit("authError", json);
+                }
+              }
+            } catch (e) {
+              socket.emit("heartbeat");
+            }
+        })
+    }catch(err){
+        socket.emit("authError", "Failed to connect");
+    }
 }
+
+const reconnect = async (stream, socket) => {
+    timeout++;
+    stream.abort();
+    await sleep(2 ** timeout * 1000);
+    getFeed(socket);
+};
+
+const sleep = async (delay) => {
+    return new Promise((resolve) => setTimeout(() => resolve(true), delay));
+};
 
 export const postTweet = async (req: express.Request, res: express.Response) => {
     var oauth_token = req.body.oauth_token;

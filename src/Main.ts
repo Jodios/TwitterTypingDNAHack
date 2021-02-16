@@ -2,12 +2,18 @@ import express from 'express';
 import figlet from "figlet";
 import twitter from "./controllers/TwitterController";
 import bodyParser from "body-parser";
+import http from "http";
+const socketIo = require("socket.io")
 
 const app = express();
 app.use(bodyParser.json())
-const port = 82;
+app.use(bodyParser.urlencoded({extended: true}))
 
-twitter(app);
+const port = 8050;
+const server = http.createServer(app);
+const socketIO = socketIo(server);
+
+twitter(app, socketIo);
 
 app.listen(port, () => {
 
