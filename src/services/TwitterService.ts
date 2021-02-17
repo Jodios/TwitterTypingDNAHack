@@ -3,7 +3,7 @@ import { vars, urls } from "../config/Config";
 import { OAuth } from "../utils/Oauth";
 import axios, { AxiosError } from "axios";
 import express from "express";
-import socket, { Socket } from "socket.io";
+import socket, { Socket, Server } from "socket.io";
 import request from "request"
 
 const callbackUrl = "http://127.0.0.1:8080/twitter/callback";
@@ -49,8 +49,41 @@ export const getAccessToken = async (req: express.Request, res: express.Response
         })
 }
 
-export const getFeed = async (socket: Socket) => {
-    var stream;
+export const test = async (req: express.Request, res: express.Response) => {
+    const config = {
+        url: urls.TWITTER_STREAM,
+        auth: {
+            bearer: vars.twitterBearerToken
+        },
+        timeout: 31000
+    };
+    const stream = request.get(config);
+
+    stream.on("data", (data) => {
+        try {
+            const json = JSON.parse(data.toString());
+            if (json.connection_issue) {
+                res.status(500);
+                res.send({
+                    message: "BAD",
+                    data: json
+                });
+            } else {
+                res.send({
+                    message: "Made it",
+                    data: json
+                });
+            }
+        } catch (e) {
+            res.send({
+                message: "error in outer try",
+                error: e
+            });
+        }
+    })
+}
+
+export const getFeed = async (socket: Server) => {
     const config = {
         url: urls.TWITTER_STREAM,
         auth: {
