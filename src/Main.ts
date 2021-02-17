@@ -1,13 +1,27 @@
 import express from 'express';
 import figlet from "figlet";
 import twitter from "./controllers/TwitterController";
+import typingDNA from "./controllers/TypingDNAController";
 import bodyParser from "body-parser";
+import http from "http";
+import socketIo, { Server } from "socket.io";
 
 const app = express();
 app.use(bodyParser.json())
-const port = 82;
+app.use(bodyParser.urlencoded({extended: true}))
 
-twitter(app);
+const port = 8050;
+const server = http.createServer(app);
+const socketServer: socketIo.Server = new socketIo.Server(server);
+
+twitter(app, socketServer);
+typingDNA(app);
+
+app.get("/", (req, res) => {
+    res.send({
+        STATUS: "UP"
+    })
+})
 
 app.listen(port, () => {
 

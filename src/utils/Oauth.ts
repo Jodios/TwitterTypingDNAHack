@@ -58,6 +58,7 @@ export class OAuth {
         for (let key in data) {
             params.push(`${encodeURIComponent(key).toString()}=${encodeURIComponent(data[key]).toString()}`)
         }
+        
         params = params.sort();
         let paramString = params.join("&");
         console.log(`params === ${params}\n\n`)

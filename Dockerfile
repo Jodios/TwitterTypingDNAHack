@@ -9,5 +9,5 @@ RUN npm install
 COPY . ./
 RUN ls src
 
-EXPOSE 82
+EXPOSE 8050
 CMD ["npm", "start"] 
