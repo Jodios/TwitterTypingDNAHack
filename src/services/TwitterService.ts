@@ -7,6 +7,7 @@ import {onAxiosError} from "../errors/ErrorHandler";
 import oauth1 from "oauth-1.0a"
 import sha1 from "crypto-js/hmac-sha1";
 import Base64 from 'crypto-js/enc-base64';
+import twitter from "ntwitter";
 
 let timeout = 0;
 
@@ -72,36 +73,7 @@ export const getAccessToken = async (req: express.Request, res: express.Response
 }
 
 export const getFeed = async (socket: Server) => {
-    const config = {
-        url: urls.TWITTER_STREAM,
-        auth: {
-            bearer: vars.twitterBearerToken
-        },
-        timeout: 31000
-    };
-    try{
-        const stream = Request.get(config);
-
-        stream.on("data", (data) => {
-            try {
-              const json = JSON.parse(data.toString());
-              if (json.connection_issue) {
-                socket.emit("error", json);
-                reconnect(stream, socket);
-              } else {
-                if (json.data) {
-                  socket.emit("tweet", json);
-                } else {
-                  socket.emit("authError", json);
-                }
-              }
-            } catch (e) {
-              socket.emit("heartbeat");
-            }
-        })
-    }catch(err){
-        socket.emit("authError", "Failed to connect");
-    }
+    let client = new twitter()
 }
 
 export const postTweet = async (req: express.Request, res: express.Response) => {
