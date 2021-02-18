@@ -1,26 +1,52 @@
-import twit from "twit";
 import { vars, urls } from "../config/Config";
-import { OAuth } from "../utils/Oauth";
-import axios, { AxiosError } from "axios";
+import axios from "axios";
 import express from "express";
-import socket, { Socket, Server } from "socket.io";
-import request from "request"
+import Request from "request";
+import { Server } from "socket.io";
+import {onAxiosError} from "../errors/ErrorHandler";
+import oauth1 from "oauth-1.0a"
+import sha1 from "crypto-js/hmac-sha1";
+import Base64 from 'crypto-js/enc-base64';
 
-const callbackUrl = "http://127.0.0.1:8080/twitter/callback";
 let timeout = 0;
 
 export const login = async (req: express.Request, res: express.Response) => {
-    let oauth = new OAuth(urls.TWITTER_REQUEST_TOKEN, vars.twitterAccessToken, vars.twitterAccessTokenSecret, vars.twitterKey, vars.twitterSecret, callbackUrl);
-    console.log(oauth.getAuthHeader())
-    axios.post(urls.TWITTER_REQUEST_TOKEN, {}, {
-        headers: {
-            Authorization: oauth.getAuthHeader()
-        }
-    }).then(resp => {
-        console.log(resp.data);
-    }).catch((err: AxiosError) => {
-        console.log(err.request);
+    let callbackUrl = req.query.oauth_callback ? req.query.oauth_callback : "http://127.0.0.1:4200";
+    const oauth = new oauth1({
+        consumer: { key: vars.twitterKey, secret: vars.twitterSecret },        
+        signature_method: 'HMAC-SHA1',
+        hash_function(base_string, key) {
+            return Base64.stringify(sha1(base_string, key))
+        },
     })
+    let x = oauth.authorize({
+        url: urls.TWITTER_REQUEST_TOKEN,
+        method: "POST",
+        includeBodyHash: false,
+        data: {
+            oauth_callback: callbackUrl
+        }
+    })
+    let header = oauth.toHeader(x);
+    axios.post(urls.TWITTER_REQUEST_TOKEN, undefined, {
+        headers: {
+            Authorization: header["Authorization"]
+        }
+    }).then((response) => {
+        res.status(response.status);
+        let tokenSecret = response.data.split("&")
+        let token = tokenSecret[0].split("=")[1]
+        let secret = tokenSecret[1].split("=")[1]
+        let callbackConfirmed = tokenSecret[2].split("=")[1]
+        let data = {
+            oauth_token: token,
+            oauth_token_secret: secret,
+            callback_confirmed: callbackConfirmed
+        }
+        console.log(`GOT REQUEST TOKEN`);
+        res.send(data);
+    }).catch(err => onAxiosError(err, res))
+
 }
 
 export const getAccessToken = async (req: express.Request, res: express.Response) => {
@@ -42,45 +68,7 @@ export const getAccessToken = async (req: express.Request, res: express.Response
                 data[keyValueList[0]] = keyValueList[1];
             });
             res.send(data);
-        }).catch((err: AxiosError) => {
-            console.log(err.message);
-            res.status(err.response.status)
-            res.send(err.response.data);
-        })
-}
-
-export const test = async (req: express.Request, res: express.Response) => {
-    const config = {
-        url: urls.TWITTER_STREAM,
-        auth: {
-            bearer: vars.twitterBearerToken
-        },
-        timeout: 31000
-    };
-    const stream = request.get(config);
-
-    stream.on("data", (data) => {
-        try {
-            const json = JSON.parse(data.toString());
-            if (json.connection_issue) {
-                res.status(500);
-                res.send({
-                    message: "BAD",
-                    data: json
-                });
-            } else {
-                res.send({
-                    message: "Made it",
-                    data: json
-                });
-            }
-        } catch (e) {
-            res.send({
-                message: "error in outer try",
-                error: e
-            });
-        }
-    })
+        }).catch(err => onAxiosError(err, res))
 }
 
 export const getFeed = async (socket: Server) => {
@@ -92,7 +80,7 @@ export const getFeed = async (socket: Server) => {
         timeout: 31000
     };
     try{
-        const stream = request.get(config);
+        const stream = Request.get(config);
 
         stream.on("data", (data) => {
             try {
@@ -116,34 +104,48 @@ export const getFeed = async (socket: Server) => {
     }
 }
 
+export const postTweet = async (req: express.Request, res: express.Response) => {
+    var oauth_token = req.body.oauth_token;
+    var oauth_token_secret = req.body.oauth_token_secret;
+    var tweet = req.body.tweet;
+    const oauth = new oauth1({
+        consumer: { key: vars.twitterKey, secret: vars.twitterSecret },        
+        signature_method: 'HMAC-SHA1',
+        hash_function(base_string, key) {
+            return Base64.stringify(sha1(base_string, key))
+        },
+    })
+    let x = oauth.authorize({
+        url: `${urls.TWITTER_UPDATE_STATUS}?include_entities=true`,
+        method: "POST",
+        includeBodyHash: false,
+        data: {
+            status: tweet
+        }
+    },{ key: oauth_token, secret: oauth_token_secret})
+    let header = oauth.toHeader(x);
+
+    axios.post(`${urls.TWITTER_UPDATE_STATUS}?include_entities=true`, `status=${encodeURIComponent(tweet).replace(/[!'()*]/g, escape)}`, {
+        headers: {
+            Authorization: header["Authorization"]
+        }
+    }).then((response) => {
+        res.status(response.status);
+        console.log(`POSTING TWEET`);
+        res.send(response.data);
+    }).catch(err => onAxiosError(err, res))
+
+
+    
+}
+
 const reconnect = async (stream, socket) => {
     timeout++;
     stream.abort();
     await sleep(2 ** timeout * 1000);
     getFeed(socket);
-};
+}
 
 const sleep = async (delay) => {
     return new Promise((resolve) => setTimeout(() => resolve(true), delay));
-};
-
-export const postTweet = async (req: express.Request, res: express.Response) => {
-    var oauth_token = req.body.oauth_token;
-    var oauth_token_secret = req.body.oauth_token_secret;
-    const twitClient = new twit({
-        consumer_key: vars.twitterKey,
-        consumer_secret: vars.twitterSecret,
-        access_token: oauth_token,
-        access_token_secret: oauth_token_secret
-    })
-    twitClient.post(`${urls.TWITTER_UPDATE_STATUS}?status=${encodeURIComponent(req.body.tweet)}`, (err, result, response) => {
-        if (err) {
-            console.log(err);
-            res.status(500);
-        } else {
-            console.log(result);
-            console.log(response);
-        }
-        res.end();
-    })
 }
