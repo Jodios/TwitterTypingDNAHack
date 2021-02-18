@@ -1,7 +1,8 @@
+import { AxiosError } from "axios";
 import express from "express";
 
-export const onAxiosError = (err:Error, res: express.Response) => {
-    console.log(err);
-    res.status(500)
-    res.send(err);
+export const onAxiosError = async (err:AxiosError, res: express.Response) => {
+    console.log(err.response.status);
+    res.status(err.response.status);
+    res.send(err.response.data);
 }

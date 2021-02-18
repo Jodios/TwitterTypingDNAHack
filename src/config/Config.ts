@@ -28,7 +28,7 @@ export const urls = {
 
 export const vars = {
     twitterKey: process.env.twitterKey,
-    twitterSecret: process.env.twitterKey,
+    twitterSecret: process.env.twitterSecret,
     twitterAccessToken: process.env.twitterAccessToken,
     twitterAccessTokenSecret: process.env.twitterAccessTokenSecret,
     twitterBearerToken: process.env.twitterBearerToken,

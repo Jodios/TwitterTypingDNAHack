@@ -5,10 +5,11 @@ import typingDNA from "./controllers/TypingDNAController";
 import bodyParser from "body-parser";
 import http from "http";
 import socketIo, { Server } from "socket.io";
+import cors from "cors";
 
 const app = express();
-app.use(bodyParser.json())
-app.use(bodyParser.urlencoded({extended: true}))
+app.use(bodyParser.json());
+app.use(cors());
 
 const port = 8050;
 const server = http.createServer(app);
@@ -32,7 +33,7 @@ app.listen(port, () => {
             return;
         }
         console.log(data);
-        console.log(`running on port ${port}`)
+        console.log(`running on port ${port} with CORS enables`)
     })
 
 });
